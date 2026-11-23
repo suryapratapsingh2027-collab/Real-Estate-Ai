@@ -1,0 +1,25 @@
+{
+  "name": "real-estate-ai-platform",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "packages/shared",
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @rea/api & npm run worker:dev -w @rea/api & npm run dev -w @rea/web",
+    "build": "npm run build -w @rea/api && npm run build -w @rea/web",
+    "typecheck": "npm run typecheck -w @rea/shared && npm run typecheck -w @rea/api && npm run typecheck -w @rea/web",
+    "test": "npm run test -w @rea/shared && npm run test -w @rea/api && npm run test -w @rea/web",
+    "test:voice": "cd apps/voice-agent && python3 -m pytest -q",
+    "db:migrate": "npm run db:migrate -w @rea/api",
+    "db:deploy": "npm run db:deploy -w @rea/api",
+    "db:seed": "npm run db:seed -w @rea/api",
+    "db:generate": "npm run db:generate -w @rea/api",
+    "test:all": "npm test && npm run test:voice"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

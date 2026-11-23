@@ -1,0 +1,83 @@
+# Local / single-host deployment.
+#   cp .env.example .env   # then fill in secrets (see README)
+#   docker compose up -d --build
+#   docker compose run --rm api seed      # demo data (non-production only)
+# Voice agent (needs LiveKit + Groq + TTS credentials):
+#   docker compose --profile voice up -d voice-agent
+
+name: real-estate-ai
+
+x-api-env: &api-env
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql://${POSTGRES_USER:-realestate}:${POSTGRES_PASSWORD:-realestate}@postgres:5432/${POSTGRES_DB:-realestate}
+    REDIS_URL: redis://redis:6379
+    QUEUE_MODE: queue
+    UPLOAD_DIR: /app/apps/api/uploads
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-realestate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-realestate}
+      POSTGRES_DB: ${POSTGRES_DB:-realestate}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-realestate}']
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      retries: 20
+
+  api:
+    build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
+    <<: *api-env
+    command: ['api']
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes: [uploads:/app/apps/api/uploads]
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      retries: 5
+
+  worker:
+    build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
+    <<: *api-env
+    command: ['worker']
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }
+    volumes: [uploads:/app/apps/api/uploads]
+
+  web:
+    build: { context: ., dockerfile: infrastructure/docker/web.Dockerfile }
+    restart: unless-stopped
+    depends_on: [api]
+    ports: ['${HTTP_PORT:-8080}:80']
+
+  voice-agent:
+    build: { context: apps/voice-agent }
+    profiles: ['voice']
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      BACKEND_URL: http://api:4000
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
