@@ -6,7 +6,9 @@ import { api, ApiError, type Paged } from '@/services/api';
 export function usePagedList<T>(key: string, path: string, filters: Record<string, unknown>, pageSize = 20) {
   const [page, setPage] = useState(1);
   const filterKey = JSON.stringify(filters);
-  useEffect(() => setPage(1), [filterKey]);
+  useEffect(() => {
+    setPage(1);
+  }, [filterKey]);
   const query = useQuery({
     queryKey: [key, 'list', filters, page, pageSize],
     queryFn: () => api<Paged<T>>(path, { query: { ...filters, page, pageSize } }),

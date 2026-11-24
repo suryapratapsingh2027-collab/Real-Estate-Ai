@@ -79,7 +79,11 @@ function ConversationThread({ id }: { id: string }) {
   const endRef = useRef<HTMLDivElement>(null);
   const convo = useQuery({ queryKey: ['conversation', id], queryFn: () => api<Conversation>(`/conversations/${id}`) });
   const msgs = useQuery({ queryKey: ['messages', id], queryFn: () => api<Paged<Message>>(`/conversations/${id}/messages`, { query: { pageSize: 200 } }) });
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), [msgs.data?.items.length]);
+  // Block body on purpose: newer browsers return a Promise from scrollIntoView(), and React
+  // would treat any returned value as a cleanup function and crash calling it.
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [msgs.data?.items.length]);
 
   const reply = useApiMutation(() => api(`/conversations/${id}/reply`, { method: 'POST', body: { text } }), { invalidate: [['messages', id], ['conversations']], onSuccess: () => setText('') });
   const takeover = useApiMutation((active: boolean) => api(`/conversations/${id}/takeover`, { method: 'POST', body: { active } }), { success: 'Updated', invalidate: [['conversation', id], ['conversations']] });
